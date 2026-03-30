@@ -1,7 +1,16 @@
 import React, { type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { Shield, Menu, X, Sun, Moon, LayoutDashboard, Settings, LogOut } from "lucide-react";
+import {
+  Shield,
+  Menu,
+  X,
+  Sun,
+  Moon,
+  LayoutDashboard,
+  Settings,
+  LogOut,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Separator } from "@/components/ui/separator";
 
@@ -48,11 +57,15 @@ export function Navbar() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 transition-opacity hover:opacity-80">
+        <Link
+          href="/"
+          className="flex items-center gap-2 transition-opacity hover:opacity-80"
+        >
           <Shield className="h-6 w-6 text-primary" />
-          <span className="font-heading text-lg font-bold text-foreground">TempShield</span>
+          <span className="font-heading text-lg font-bold text-foreground">
+            TempShield
+          </span>
         </Link>
 
         {/* Desktop Nav */}
@@ -69,17 +82,26 @@ export function Navbar() {
           >
             Pricing
           </button>
-          <Link href="/docs" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+          <Link
+            href="/docs"
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
             API Docs
           </Link>
           {user && (
-            <Link href="/dashboard" className="text-sm text-muted-foreground transition-colors hover:text-foreground flex items-center gap-1.5">
+            <Link
+              href="/dashboard"
+              className="text-sm text-muted-foreground transition-colors hover:text-foreground flex items-center gap-1.5"
+            >
               <LayoutDashboard className="h-3.5 w-3.5" />
               Dashboard
             </Link>
           )}
           {user?.role === "ADMIN" && (
-            <Link href="/admin" className="text-sm text-muted-foreground transition-colors hover:text-foreground flex items-center gap-1.5">
+            <Link
+              href="/admin"
+              className="text-sm text-muted-foreground transition-colors hover:text-foreground flex items-center gap-1.5"
+            >
               <Settings className="h-3.5 w-3.5" />
               Admin
             </Link>
@@ -93,7 +115,11 @@ export function Navbar() {
             className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/50 text-muted-foreground transition-colors hover:text-foreground hover:bg-muted"
             aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
           >
-            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {isDark ? (
+              <Sun className="h-4 w-4" />
+            ) : (
+              <Moon className="h-4 w-4" />
+            )}
           </button>
 
           {user ? (
@@ -125,7 +151,11 @@ export function Navbar() {
             className="md:hidden flex h-9 w-9 items-center justify-center rounded-lg border border-border/50 text-muted-foreground"
             onClick={() => setMobileOpen(!mobileOpen)}
           >
-            {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            {mobileOpen ? (
+              <X className="h-4 w-4" />
+            ) : (
+              <Menu className="h-4 w-4" />
+            )}
           </button>
         </div>
       </div>
@@ -141,28 +171,71 @@ export function Navbar() {
           >
             <div className="px-6 py-4 flex flex-col gap-4">
               <button
-                onClick={() => { scrollTo("features"); setMobileOpen(false); }}
+                onClick={() => {
+                  scrollTo("features");
+                  setMobileOpen(false);
+                }}
                 className="text-sm font-medium text-muted-foreground hover:text-foreground text-left"
               >
                 Features
               </button>
               <button
-                onClick={() => { scrollTo("pricing"); setMobileOpen(false); }}
+                onClick={() => {
+                  scrollTo("pricing");
+                  setMobileOpen(false);
+                }}
                 className="text-sm font-medium text-muted-foreground hover:text-foreground text-left"
               >
                 Pricing
               </button>
-              <Link href="/docs" onClick={() => setMobileOpen(false)} className="text-sm font-medium text-muted-foreground hover:text-foreground">API Docs</Link>
+              <Link
+                href="/docs"
+                onClick={() => setMobileOpen(false)}
+                className="text-sm font-medium text-muted-foreground hover:text-foreground"
+              >
+                API Docs
+              </Link>
               {user ? (
                 <>
-                  <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="text-sm font-medium text-muted-foreground hover:text-foreground">Dashboard</Link>
-                  {user.role === "ADMIN" && <Link href="/admin" onClick={() => setMobileOpen(false)} className="text-sm font-medium text-muted-foreground hover:text-foreground">Admin</Link>}
-                  <button onClick={logout} className="text-sm font-medium text-destructive text-left">Logout</button>
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setMobileOpen(false)}
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground"
+                  >
+                    Dashboard
+                  </Link>
+                  {user.role === "ADMIN" && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setMobileOpen(false)}
+                      className="text-sm font-medium text-muted-foreground hover:text-foreground"
+                    >
+                      Admin
+                    </Link>
+                  )}
+                  <button
+                    onClick={logout}
+                    className="text-sm font-medium text-destructive text-left"
+                  >
+                    Logout
+                  </button>
                 </>
               ) : (
                 <>
-                  <Link href="/login" onClick={() => setMobileOpen(false)} className="text-sm font-medium text-muted-foreground hover:text-foreground">Log in</Link>
-                  <Link href="/signup" onClick={() => setMobileOpen(false)} className="text-sm font-semibold text-primary">Get Started Free</Link>
+                  <Link
+                    href="/login"
+                    onClick={() => setMobileOpen(false)}
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground"
+                  >
+                    Log in
+                  </Link>
+                  <Link
+                    href="/signup"
+                    onClick={() => setMobileOpen(false)}
+                    className="text-sm font-semibold text-primary"
+                  >
+                    Get Started Free
+                  </Link>
                 </>
               )}
             </div>
@@ -180,24 +253,29 @@ export function Footer() {
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-primary" />
-            <span className="font-heading text-sm font-bold text-foreground">TempShield</span>
+            <span className="font-heading text-sm font-bold text-foreground">
+              TempShield
+            </span>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
-            <Link href="/docs" className="transition-colors hover:text-foreground">Documentation</Link>
-            <Link href="/pricing" className="transition-colors hover:text-foreground">Pricing</Link>
-            <a
-              href="https://github.com/disposable-email-domains/disposable-email-domains"
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              href="/docs"
               className="transition-colors hover:text-foreground"
             >
-              GitHub
-            </a>
+              Documentation
+            </Link>
+            <Link
+              href="/pricing"
+              className="transition-colors hover:text-foreground"
+            >
+              Pricing
+            </Link>
           </div>
         </div>
         <Separator className="my-6" />
         <p className="text-center text-xs text-muted-foreground">
-          Built for developers, by developers. &copy; {new Date().getFullYear()} TempShield.
+          Built for developers, by developers. &copy; {new Date().getFullYear()}{" "}
+          TempShield.
         </p>
       </div>
     </footer>

@@ -17,6 +17,7 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AdminRevenueData,
   AdminStats,
   AdminUsersResponse,
   ApiKeyResponse,
@@ -1310,6 +1311,80 @@ export function useAdminGetStats<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getAdminGetStatsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get revenue data (admin only)
+ */
+export const getAdminGetRevenueUrl = () => {
+  return `/api/admin/revenue`;
+};
+
+export const adminGetRevenue = async (
+  options?: RequestInit,
+): Promise<AdminRevenueData> => {
+  return customFetch<AdminRevenueData>(getAdminGetRevenueUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getAdminGetRevenueQueryKey = () => {
+  return [`/api/admin/revenue`] as const;
+};
+
+export const getAdminGetRevenueQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminGetRevenue>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof adminGetRevenue>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getAdminGetRevenueQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof adminGetRevenue>>> = ({
+    signal,
+  }) => adminGetRevenue({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof adminGetRevenue>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type AdminGetRevenueQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminGetRevenue>>
+>;
+export type AdminGetRevenueQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get revenue data (admin only)
+ */
+export function useAdminGetRevenue<
+  TData = Awaited<ReturnType<typeof adminGetRevenue>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof adminGetRevenue>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getAdminGetRevenueQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

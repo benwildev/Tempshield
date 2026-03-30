@@ -229,3 +229,32 @@ export interface AdminStats {
   pendingUpgradeRequests: number;
   usersByPlan: AdminStatsUsersByPlan;
 }
+
+export interface AdminRevenueByPlanItem {
+  plan: string;
+  price: number;
+  userCount: number;
+  revenue: number;
+}
+
+export interface AdminRevenueMonthlyItem {
+  month: string;
+  count: number;
+}
+
+export interface AdminRevenueRecentItem {
+  id: number;
+  userName: string;
+  userEmail: string;
+  plan: string;
+  price: number;
+  createdAt: string;
+}
+
+export interface AdminRevenueData {
+  mrr: number;
+  totalPaidUsers: number;
+  revenueByPlan: AdminRevenueByPlanItem[];
+  monthlySubs: AdminRevenueMonthlyItem[];
+  recent: AdminRevenueRecentItem[];
+}

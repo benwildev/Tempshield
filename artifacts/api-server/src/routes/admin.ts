@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { Readable } from "stream";
 import { db, usersTable, apiUsageTable, domainsTable, upgradeRequestsTable, planConfigsTable, userWebsitesTable, userPagesTable, paymentSettingsTable } from "@workspace/db";
-import { eq, sql, count } from "drizzle-orm";
+import { eq, sql, count, desc, and, gte } from "drizzle-orm";
 import { z } from "zod";
 import { requireAdmin } from "../middlewares/session.js";
 import { syncDomainsFromGitHub } from "../lib/domain-cache.js";
@@ -717,6 +717,92 @@ router.get("/api-keys", requireAdmin, async (req, res) => {
     })),
     total: users.length,
   });
+});
+
+router.get("/revenue", requireAdmin, async (req, res) => {
+  const planConfigs = await db.select().from(planConfigsTable);
+  const priceMap: Record<string, number> = {};
+  for (const pc of planConfigs) {
+    priceMap[pc.plan] = pc.price;
+  }
+
+  const planCounts = await db
+    .select({ plan: usersTable.plan, count: count() })
+    .from(usersTable)
+    .groupBy(usersTable.plan);
+
+  const userCountByPlan: Record<string, number> = {};
+  for (const row of planCounts) {
+    userCountByPlan[row.plan] = Number(row.count);
+  }
+
+  let mrr = 0;
+  const revenueByPlan = planConfigs.map((pc) => {
+    const userCount = userCountByPlan[pc.plan] || 0;
+    const revenue = pc.price * userCount;
+    if (pc.plan !== "FREE") mrr += revenue;
+    return { plan: pc.plan, price: pc.price, userCount, revenue };
+  });
+
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 11);
+  twelveMonthsAgo.setDate(1);
+  twelveMonthsAgo.setHours(0, 0, 0, 0);
+
+  const monthlyRaw = await db
+    .select({
+      month: sql<string>`to_char(${upgradeRequestsTable.createdAt}, 'YYYY-MM')`,
+      count: count(),
+    })
+    .from(upgradeRequestsTable)
+    .where(and(
+      eq(upgradeRequestsTable.status, "APPROVED"),
+      gte(upgradeRequestsTable.createdAt, twelveMonthsAgo),
+    ))
+    .groupBy(sql`to_char(${upgradeRequestsTable.createdAt}, 'YYYY-MM')`)
+    .orderBy(sql`to_char(${upgradeRequestsTable.createdAt}, 'YYYY-MM')`);
+
+  const monthlyMap: Record<string, number> = {};
+  for (const row of monthlyRaw) {
+    monthlyMap[row.month] = Number(row.count);
+  }
+
+  const monthlySubs: { month: string; count: number }[] = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    monthlySubs.push({ month: key, count: monthlyMap[key] || 0 });
+  }
+
+  const recentRaw = await db
+    .select({
+      id: upgradeRequestsTable.id,
+      userName: usersTable.name,
+      userEmail: usersTable.email,
+      plan: upgradeRequestsTable.planRequested,
+      createdAt: upgradeRequestsTable.createdAt,
+    })
+    .from(upgradeRequestsTable)
+    .leftJoin(usersTable, eq(upgradeRequestsTable.userId, usersTable.id))
+    .where(eq(upgradeRequestsTable.status, "APPROVED"))
+    .orderBy(desc(upgradeRequestsTable.createdAt))
+    .limit(20);
+
+  const recent = recentRaw.map((r) => ({
+    id: r.id,
+    userName: r.userName || "Unknown",
+    userEmail: r.userEmail || "Unknown",
+    plan: r.plan,
+    price: priceMap[r.plan] || 0,
+    createdAt: r.createdAt.toISOString(),
+  }));
+
+  const totalPaidUsers = planCounts
+    .filter((r) => r.plan !== "FREE")
+    .reduce((a, b) => a + Number(b.count), 0);
+
+  res.json({ mrr, totalPaidUsers, revenueByPlan, monthlySubs, recent });
 });
 
 export default router;
