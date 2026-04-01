@@ -48,3 +48,12 @@ Thumbs.db
 .cache/
 .local/
 .env
+.env.*
+
+# Runtime databases & logs
+*.db
+*.sqlite
+*.log
+
+# Chat-attached development assets (not part of source)
+attached_assets/
