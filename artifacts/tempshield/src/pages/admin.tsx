@@ -1147,6 +1147,7 @@ interface PaymentSettingsData {
   paypalSecret: string | null;
   paypalMode: "sandbox" | "live";
   planPrices: Record<string, number>;
+  freeVerifyLimit: number;
   updatedAt?: string;
   connectionStatus?: ConnectionStatus;
 }
@@ -1394,6 +1395,29 @@ function PaymentSection() {
               ))}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Free Verifier Limit */}
+      <div className="glass-card rounded-xl p-6 mb-4">
+        <h3 className="font-heading text-sm font-semibold text-foreground flex items-center gap-2 mb-4">
+          <Shield className="w-4 h-4 text-primary" /> Free Email Verifier
+        </h3>
+        <div>
+          <label className="text-xs text-muted-foreground font-medium block mb-1">
+            Free checks per session (0 to disable)
+          </label>
+          <input
+            type="number"
+            min={0}
+            max={1000}
+            value={form.freeVerifyLimit ?? 5}
+            onChange={e => set("freeVerifyLimit", Math.max(0, Math.min(1000, parseInt(e.target.value, 10) || 0)))}
+            className="w-32 bg-background/50 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+          <p className="text-xs text-muted-foreground mt-1.5">
+            Controls how many free checks anonymous visitors can run on the <code className="bg-background/70 px-1 py-0.5 rounded text-primary">/verify</code> page per 24-hour session.
+          </p>
         </div>
       </div>
 

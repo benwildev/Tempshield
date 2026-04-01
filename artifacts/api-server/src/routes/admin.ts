@@ -618,6 +618,7 @@ router.get("/payment-settings", requireAdmin, async (req, res) => {
     paypalSecret: settings.paypalSecret ? `${settings.paypalSecret.slice(0, 8)}••••••••` : null,
     paypalMode: settings.paypalMode,
     planPrices: settings.planPrices || { BASIC: 9, PRO: 29 },
+    freeVerifyLimit: settings.freeVerifyLimit ?? 5,
     updatedAt: settings.updatedAt.toISOString(),
     connectionStatus: computeGatewayStatuses(settings),
   });
@@ -634,6 +635,7 @@ const updatePaymentSettingsSchema = z.object({
   paypalSecret: z.string().optional().nullable(),
   paypalMode: z.enum(["sandbox", "live"]).optional(),
   planPrices: z.record(z.string(), z.number().positive()).optional(),
+  freeVerifyLimit: z.number().int().min(0).max(1000).optional(),
 });
 
 router.put("/payment-settings", requireAdmin, async (req, res) => {
@@ -659,6 +661,7 @@ router.put("/payment-settings", requireAdmin, async (req, res) => {
   if (data.paypalClientId !== undefined) updates.paypalClientId = data.paypalClientId;
   if (data.paypalMode !== undefined) updates.paypalMode = data.paypalMode;
   if (data.planPrices !== undefined) updates.planPrices = data.planPrices;
+  if (data.freeVerifyLimit !== undefined) updates.freeVerifyLimit = data.freeVerifyLimit;
 
   // Only update secret fields if they don't contain the masked placeholder
   if (data.stripeSecretKey !== undefined && data.stripeSecretKey !== null && !data.stripeSecretKey.includes("••••••••")) {

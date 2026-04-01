@@ -13,6 +13,7 @@ import DashboardPage from "./pages/dashboard";
 import DocsPage from "./pages/docs";
 import UpgradePage from "./pages/upgrade";
 import AdminPage from "./pages/admin";
+import VerifyPage from "./pages/verify";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ function Router() {
       <Route path="/" component={LandingPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/docs" component={DocsPage} />
+      <Route path="/verify" component={VerifyPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/signup" component={RegisterPage} />
       

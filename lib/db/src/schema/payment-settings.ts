@@ -1,4 +1,4 @@
-import { pgTable, serial, text, jsonb, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, jsonb, timestamp, boolean, integer } from "drizzle-orm/pg-core";
 
 export const paymentSettingsTable = pgTable("payment_settings", {
   id: serial("id").primaryKey(),
@@ -12,6 +12,7 @@ export const paymentSettingsTable = pgTable("payment_settings", {
   paypalSecret: text("paypal_secret"),
   paypalMode: text("paypal_mode").notNull().default("sandbox"),
   planPrices: jsonb("plan_prices").$type<Record<string, number>>().default({ BASIC: 9, PRO: 29 }),
+  freeVerifyLimit: integer("free_verify_limit").notNull().default(5),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
