@@ -20,7 +20,7 @@ import {
   Copy, RefreshCw, Activity, ArrowUpRight, CheckCircle2, Key,
   BarChart3, Clock, Globe, FileText, Plus, Trash2, Loader2, X,
   Webhook, ShieldBan, Eye, EyeOff, Shield, AlertTriangle, ChevronDown,
-  TrendingUp, ListFilter, ChevronLeft, ChevronRight, CreditCard, Download, Zap,
+  TrendingUp, ListFilter, ChevronLeft, ChevronRight, CreditCard, Download, Zap, Code,
 } from "lucide-react";
 import ReputationBadge from "@/components/ReputationBadge";
 import { motion, AnimatePresence } from "framer-motion";
@@ -739,6 +739,7 @@ function ApiKeysTab({
   const [revealedKeys, setRevealedKeys] = useState<Set<number>>(new Set());
   const [newlyCreated, setNewlyCreated] = useState<{ id: number; key: string } | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [scriptCopied, setScriptCopied] = useState(false);
 
   const keys = keysQuery.data?.keys ?? [];
 
@@ -776,6 +777,14 @@ function ApiKeysTab({
     });
   };
 
+  const scriptSnippet = `<script\n  src="${typeof window !== "undefined" ? window.location.origin : ""}/temp-email-validator.js"\n  data-api-key="${apiKey}">\n</script>`;
+
+  const handleCopyScript = () => {
+    navigator.clipboard.writeText(scriptSnippet);
+    setScriptCopied(true);
+    setTimeout(() => setScriptCopied(false), 2000);
+  };
+
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Primary API Key */}
@@ -804,6 +813,27 @@ function ApiKeysTab({
           <code className="rounded bg-muted px-1.5 py-0.5 text-primary text-xs">Authorization: Bearer &lt;key&gt;</code>
           {" "}in your requests.
         </p>
+      </motion.div>
+
+      {/* Embed Script */}
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04 }} className="glass-card rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <Code className="h-4 w-4 text-primary" />
+            <h2 className="font-heading text-base font-semibold text-foreground">Embed Script</h2>
+          </div>
+          <button
+            onClick={handleCopyScript}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/15 text-primary hover:bg-primary/25 transition-colors text-xs font-medium"
+          >
+            {scriptCopied ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            {scriptCopied ? "Copied!" : "Copy"}
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Paste this before the closing <code className="rounded bg-muted px-1 py-0.5 text-primary text-xs">&lt;/body&gt;</code> tag on any page you want to protect.
+        </p>
+        <pre className="rounded-xl bg-muted/60 border border-border px-4 py-3 text-xs font-mono text-foreground/80 overflow-x-auto whitespace-pre select-all">{scriptSnippet}</pre>
       </motion.div>
 
       {/* Named API Keys */}
