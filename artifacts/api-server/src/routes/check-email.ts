@@ -177,7 +177,19 @@ async function checkOriginAllowed(req: Request, userId: number): Promise<{ allow
     .from(userWebsitesTable)
     .where(eq(userWebsitesTable.userId, userId));
 
-  if (allowedWebsites.length === 0) return { allowed: true };
+  if (allowedWebsites.length === 0) {
+    // No allowed websites configured — permit server-to-server calls (no Origin header)
+    // but block browser-originated requests (which carry an Origin header).
+    const hasOrigin = !!(req.headers["origin"] || req.headers["referer"]);
+    if (hasOrigin) {
+      return {
+        allowed: false,
+        reason:
+          "Browser requests are blocked until you configure at least one allowed website. Add your domain in the dashboard under Settings → Allowed Websites.",
+      };
+    }
+    return { allowed: true };
+  }
 
   const requestDomain = extractRequestDomain(req);
   if (!requestDomain) {
