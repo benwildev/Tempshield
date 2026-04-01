@@ -139,10 +139,12 @@ The `isFreeEmail(domain)` function in `artifacts/api-server/src/lib/reputation.t
 - `POST /api/admin/email-settings/test` — send test email
 
 **Site Settings & SEO:**
-- `GET /api/site-settings` — public endpoint: siteTitle, tagline, logoUrl, faviconUrl, globalMetaTitle, globalMetaDescription, footerText
-- `PUT /api/admin/site-settings` — update branding & global meta defaults (admin only)
-- `GET /api/admin/site-settings/page?slug=<path>` — get per-page SEO (admin only)
-- `PUT /api/admin/site-settings/page?slug=<path>` — update per-page SEO (admin only)
+- `GET /api/site-settings` — public: returns siteTitle, tagline, logoUrl, faviconUrl, globalMetaTitle, globalMetaDescription, footerText
+- `GET /api/site-settings/page?slug=<path>` — public: per-page SEO (metaTitle, metaDescription, keywords, og* tags) for allowed slugs
+- `GET /api/admin/site-settings` — admin: read current branding settings
+- `PATCH /api/admin/site-settings` — admin: update branding & global meta defaults
+- `GET /api/admin/site-settings/page?slug=<path>` — admin: read per-page SEO
+- `PATCH /api/admin/site-settings/page?slug=<path>` — admin: update per-page SEO
 
 ## Security Features
 

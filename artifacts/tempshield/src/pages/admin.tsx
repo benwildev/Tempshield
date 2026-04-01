@@ -1962,8 +1962,8 @@ interface SiteSettingsData {
 function BrandingSection() {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery<SiteSettingsData>({
-    queryKey: ["/api/site-settings"],
-    queryFn: () => fetch("/api/site-settings").then(r => r.json()),
+    queryKey: ["/api/admin/site-settings"],
+    queryFn: () => fetch("/api/admin/site-settings").then(r => r.json()),
   });
 
   const [form, setForm] = useState<SiteSettingsData>({
@@ -2000,7 +2000,7 @@ function BrandingSection() {
     setError(null);
     try {
       const res = await fetch("/api/admin/site-settings", {
-        method: "PUT",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
@@ -2008,6 +2008,7 @@ function BrandingSection() {
         const j = await res.json();
         throw new Error(j.error || "Failed to save");
       }
+      qc.invalidateQueries({ queryKey: ["/api/admin/site-settings"] });
       qc.invalidateQueries({ queryKey: ["/api/site-settings"] });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -2149,7 +2150,7 @@ function PageSeoEditor({ slug, label }: { slug: string; label: string }) {
     setError(null);
     try {
       const res = await fetch(`/api/admin/site-settings/page?slug=${encodeURIComponent(slug)}`, {
-        method: "PUT",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
@@ -2158,6 +2159,7 @@ function PageSeoEditor({ slug, label }: { slug: string; label: string }) {
         throw new Error(j.error || "Failed to save");
       }
       qc.invalidateQueries({ queryKey: [`/api/admin/site-settings/page?slug=${slug}`] });
+      qc.invalidateQueries({ queryKey: [`/api/site-settings/page?slug=${slug}`] });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (e) {

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { useLocation } from "wouter";
 
 export interface SiteSettings {
   siteTitle: string;
@@ -9,7 +10,20 @@ export interface SiteSettings {
   globalMetaTitle: string;
   globalMetaDescription: string;
   footerText: string | null;
+  updatedAt?: string;
 }
+
+export interface PageSeo {
+  slug: string;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  keywords: string | null;
+  ogTitle: string | null;
+  ogDescription: string | null;
+  ogImage: string | null;
+}
+
+const ALLOWED_SLUGS = new Set(["/", "/pricing", "/docs", "/login", "/signup", "/dashboard", "/upgrade"]);
 
 const DEFAULTS: SiteSettings = {
   siteTitle: "TempShield",
@@ -30,30 +44,48 @@ export function useSiteSettings(): SiteSettings {
   return data ?? DEFAULTS;
 }
 
-export function useApplyHeadMeta(overrides?: {
-  title?: string | null;
-  description?: string | null;
-  keywords?: string | null;
-}) {
+export function usePageSeo(slug: string): PageSeo | null {
+  const enabled = ALLOWED_SLUGS.has(slug);
+  const { data } = useQuery<PageSeo>({
+    queryKey: [`/api/site-settings/page?slug=${slug}`],
+    queryFn: () => fetch(`/api/site-settings/page?slug=${encodeURIComponent(slug)}`).then((r) => r.json()),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+  return data ?? null;
+}
+
+export function useApplyHeadMeta() {
   const settings = useSiteSettings();
+  const [location] = useLocation();
+
+  const pageSeo = usePageSeo(location);
 
   useEffect(() => {
-    const title = overrides?.title || settings.globalMetaTitle;
-    const description = overrides?.description || settings.globalMetaDescription;
-    const keywords = overrides?.keywords || null;
+    const title = pageSeo?.metaTitle || settings.globalMetaTitle;
+    const description = pageSeo?.metaDescription || settings.globalMetaDescription;
+    const keywords = pageSeo?.keywords || null;
+    const ogTitle = pageSeo?.ogTitle || title;
+    const ogDescription = pageSeo?.ogDescription || description;
+    const ogImage = pageSeo?.ogImage || null;
 
     document.title = title;
 
     setMeta("name", "description", description);
-    if (keywords) setMeta("name", "keywords", keywords);
+    if (keywords) {
+      setMeta("name", "keywords", keywords);
+    }
 
-    setMeta("property", "og:title", title);
-    setMeta("property", "og:description", description);
+    setMeta("property", "og:title", ogTitle);
+    setMeta("property", "og:description", ogDescription);
+    if (ogImage) {
+      setMeta("property", "og:image", ogImage);
+    }
 
     if (settings.faviconUrl) {
       setFavicon(settings.faviconUrl);
     }
-  }, [settings, overrides?.title, overrides?.description, overrides?.keywords]);
+  }, [settings, pageSeo, location]);
 }
 
 function setMeta(attr: "name" | "property", value: string, content: string) {

@@ -6,6 +6,8 @@ import { requireAdmin } from "../middlewares/session.js";
 
 const router = Router();
 
+const ALLOWED_SLUGS = new Set(["/", "/pricing", "/docs", "/login", "/signup", "/dashboard", "/upgrade"]);
+
 const DEFAULTS = {
   siteTitle: "TempShield",
   tagline: "Block Fake Emails. Protect Your Platform.",
@@ -23,20 +25,68 @@ async function getOrInitSettings() {
   return created;
 }
 
+function formatSettings(s: typeof siteSettingsTable.$inferSelect) {
+  return {
+    siteTitle: s.siteTitle ?? DEFAULTS.siteTitle,
+    tagline: s.tagline ?? DEFAULTS.tagline,
+    logoUrl: s.logoUrl ?? null,
+    faviconUrl: s.faviconUrl ?? null,
+    globalMetaTitle: s.globalMetaTitle ?? DEFAULTS.globalMetaTitle,
+    globalMetaDescription: s.globalMetaDescription ?? DEFAULTS.globalMetaDescription,
+    footerText: s.footerText ?? null,
+    updatedAt: s.updatedAt.toISOString(),
+  };
+}
+
+function formatPageSeo(row: typeof pageSeoTable.$inferSelect | undefined, slug: string) {
+  if (!row) {
+    return { slug, metaTitle: null, metaDescription: null, keywords: null, ogTitle: null, ogDescription: null, ogImage: null };
+  }
+  return {
+    slug: row.slug,
+    metaTitle: row.metaTitle,
+    metaDescription: row.metaDescription,
+    keywords: row.keywords,
+    ogTitle: row.ogTitle,
+    ogDescription: row.ogDescription,
+    ogImage: row.ogImage,
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+// ── Public endpoints ──────────────────────────────────────────────────────────
+
 router.get("/site-settings", async (_req, res) => {
   try {
     const s = await getOrInitSettings();
-    res.json({
-      siteTitle: s.siteTitle ?? DEFAULTS.siteTitle,
-      tagline: s.tagline ?? DEFAULTS.tagline,
-      logoUrl: s.logoUrl ?? null,
-      faviconUrl: s.faviconUrl ?? null,
-      globalMetaTitle: s.globalMetaTitle ?? DEFAULTS.globalMetaTitle,
-      globalMetaDescription: s.globalMetaDescription ?? DEFAULTS.globalMetaDescription,
-      footerText: s.footerText ?? null,
-    });
+    res.json(formatSettings(s));
   } catch {
-    res.json(DEFAULTS);
+    res.json({ ...DEFAULTS, updatedAt: new Date().toISOString() });
+  }
+});
+
+router.get("/site-settings/page", async (req: any, res: any) => {
+  const slug = String(req.query.slug || "/");
+  if (!ALLOWED_SLUGS.has(slug)) {
+    res.status(400).json({ error: "Unknown page slug" });
+    return;
+  }
+  try {
+    const [row] = await db.select().from(pageSeoTable).where(eq(pageSeoTable.slug, slug)).limit(1);
+    res.json(formatPageSeo(row, slug));
+  } catch {
+    res.json({ slug, metaTitle: null, metaDescription: null, keywords: null, ogTitle: null, ogDescription: null, ogImage: null });
+  }
+});
+
+// ── Admin endpoints ───────────────────────────────────────────────────────────
+
+router.get("/admin/site-settings", requireAdmin, async (_req, res) => {
+  try {
+    const s = await getOrInitSettings();
+    res.json(formatSettings(s));
+  } catch {
+    res.json({ ...DEFAULTS, updatedAt: new Date().toISOString() });
   }
 });
 
@@ -50,7 +100,7 @@ const updateSiteSettingsSchema = z.object({
   footerText: z.string().max(320).nullable().optional(),
 });
 
-router.put("/admin/site-settings", requireAdmin, async (req, res) => {
+router.patch("/admin/site-settings", requireAdmin, async (req, res) => {
   const result = updateSiteSettingsSchema.safeParse(req.body);
   if (!result.success) {
     res.status(400).json({ error: "Invalid input", details: result.error.issues });
@@ -74,21 +124,12 @@ router.put("/admin/site-settings", requireAdmin, async (req, res) => {
 
 router.get("/admin/site-settings/page", requireAdmin, async (req: any, res: any) => {
   const slug = String(req.query.slug || "/");
-  const [row] = await db.select().from(pageSeoTable).where(eq(pageSeoTable.slug, slug)).limit(1);
-  if (!row) {
-    res.json({ slug, metaTitle: null, metaDescription: null, keywords: null, ogTitle: null, ogDescription: null, ogImage: null });
+  if (!ALLOWED_SLUGS.has(slug)) {
+    res.status(400).json({ error: "Unknown page slug" });
     return;
   }
-  res.json({
-    slug: row.slug,
-    metaTitle: row.metaTitle,
-    metaDescription: row.metaDescription,
-    keywords: row.keywords,
-    ogTitle: row.ogTitle,
-    ogDescription: row.ogDescription,
-    ogImage: row.ogImage,
-    updatedAt: row.updatedAt.toISOString(),
-  });
+  const [row] = await db.select().from(pageSeoTable).where(eq(pageSeoTable.slug, slug)).limit(1);
+  res.json(formatPageSeo(row, slug));
 });
 
 const updatePageSeoSchema = z.object({
@@ -100,8 +141,13 @@ const updatePageSeoSchema = z.object({
   ogImage: z.string().url().max(2048).nullable().optional(),
 });
 
-router.put("/admin/site-settings/page", requireAdmin, async (req: any, res: any) => {
+router.patch("/admin/site-settings/page", requireAdmin, async (req: any, res: any) => {
   const slug = String(req.query.slug || "/");
+  if (!ALLOWED_SLUGS.has(slug)) {
+    res.status(400).json({ error: "Unknown page slug" });
+    return;
+  }
+
   const result = updatePageSeoSchema.safeParse(req.body);
   if (!result.success) {
     res.status(400).json({ error: "Invalid input", details: result.error.issues });
