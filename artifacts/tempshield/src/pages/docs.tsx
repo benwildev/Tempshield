@@ -45,12 +45,24 @@ const INTEGRATIONS = [
   data-api-key="YOUR_API_KEY">
 </script>
 
-<!-- Optional: customize behavior -->
+<!-- Full configuration example with all options -->
 <script
   src="https://yourdomain.com/temp-email-validator.js"
   data-api-key="YOUR_API_KEY"
-  data-error-message="Please use a real email address."
-  data-debounce="800">
+
+  data-debounce="600"
+
+  data-error-message="Disposable email addresses are not allowed."
+  data-error-color="#ef4444"
+  data-error-border="#f87171"
+
+  data-warn-mx-message="This email domain has no mail server — you may not receive messages."
+  data-warn-mx-color="#f59e0b"
+  data-warn-mx-border="#fbbf24"
+
+  data-warn-free-message="Free email providers are not accepted. Please use a work email."
+  data-warn-free-color="#f59e0b"
+  data-warn-free-border="#fbbf24">
 </script>`,
   },
   {
@@ -427,6 +439,67 @@ export default function DocsPage() {
                   <CodeBlock lang={current.label} code={current.code} />
                 </motion.div>
               </AnimatePresence>
+            </div>
+
+            {/* EMBED SCRIPT ATTRIBUTES */}
+            <div className="glass-card rounded-2xl overflow-hidden mt-6">
+              <div className="p-8 border-b border-border/50">
+                <h2 className="font-heading text-lg font-semibold text-foreground mb-2">Embed Script Attributes</h2>
+                <p className="text-sm text-muted-foreground">
+                  All behaviour of the <code className="rounded bg-muted px-1.5 py-0.5 text-primary text-xs font-mono">temp-email-validator.js</code> embed script is controlled by <code className="rounded bg-muted px-1.5 py-0.5 text-primary text-xs font-mono">data-*</code> attributes on the script tag.
+                  The script has three display states — <span className="text-red-500 font-medium">Error</span> (blocks submit), <span className="text-amber-500 font-medium">Warning</span> (alerts but allows submit), and <span className="text-green-500 font-medium">Clear</span>.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border/50 bg-muted/20">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Attribute</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Default</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/30">
+                    {[
+                      { attr: "data-api-key", def: '""', desc: "Your API key (required). Sent as Bearer token." },
+                      { attr: "data-api-url", def: "script origin", desc: "Base URL of the API server. Defaults to the script's own origin." },
+                      { attr: "data-debounce", def: "600", desc: "Milliseconds to wait after typing stops before firing the check." },
+                      { attr: "data-error-message", def: "Temporary email addresses…", desc: "❌ Error shown for disposable emails. Blocks form submission." },
+                      { attr: "data-error-color", def: "#ef4444", desc: "Text colour for the disposable-email error message." },
+                      { attr: "data-error-border", def: "#f87171", desc: "Input border colour when a disposable email is detected." },
+                      { attr: "data-warn-mx-message", def: "This email domain has no mail server…", desc: "⚠️ Warning shown when the domain has no MX records. Does NOT block submit." },
+                      { attr: "data-warn-mx-color", def: "#f59e0b", desc: "Text colour for the MX warning message." },
+                      { attr: "data-warn-mx-border", def: "#fbbf24", desc: "Input border colour for the MX warning." },
+                      { attr: "data-warn-free-message", def: "Free email providers are not accepted…", desc: "⚠️ Warning shown for free providers (Gmail, Yahoo, etc.). Does NOT block submit." },
+                      { attr: "data-warn-free-color", def: "#f59e0b", desc: "Text colour for the free email warning message." },
+                      { attr: "data-warn-free-border", def: "#fbbf24", desc: "Input border colour for the free email warning." },
+                    ].map(row => (
+                      <tr key={row.attr} className="hover:bg-muted/10 transition-colors">
+                        <td className="px-6 py-3 font-mono text-xs text-primary whitespace-nowrap">{row.attr}</td>
+                        <td className="px-6 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">{row.def}</td>
+                        <td className="px-6 py-3 text-xs text-muted-foreground">{row.desc}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="p-8 border-t border-border/50 bg-muted/5 space-y-4">
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Priority when multiple conditions are true</p>
+                  <div className="flex flex-wrap gap-3 text-xs">
+                    <span className="flex items-center gap-1.5 rounded-full bg-red-500/10 border border-red-500/20 px-3 py-1 text-red-500 font-medium">1. Disposable → Error (blocks form)</span>
+                    <span className="text-muted-foreground self-center">→</span>
+                    <span className="flex items-center gap-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1 text-amber-500 font-medium">2. Free email → Warning</span>
+                    <span className="text-muted-foreground self-center">→</span>
+                    <span className="flex items-center gap-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1 text-amber-500 font-medium">3. No MX → Warning</span>
+                    <span className="text-muted-foreground self-center">→</span>
+                    <span className="flex items-center gap-1.5 rounded-full bg-green-500/10 border border-green-500/20 px-3 py-1 text-green-500 font-medium">4. Clean → Clear</span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  MX detection and free email flagging are only active if your plan has those features enabled. The script reads <code className="rounded bg-muted px-1 py-0.5 text-primary font-mono">mxValid</code> and <code className="rounded bg-muted px-1 py-0.5 text-primary font-mono">isFreeEmail</code> from the API response automatically — no extra configuration needed.
+                </p>
+              </div>
             </div>
 
             {/* RATE LIMITS */}
