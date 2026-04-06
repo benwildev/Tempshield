@@ -1620,6 +1620,7 @@ interface BulkJobResultItem {
   isRoleAccount?: boolean;
   mxValid?: boolean | null;
   inboxSupport?: boolean | null;
+  tags?: string[];
   error?: string;
 }
 
@@ -1655,7 +1656,10 @@ function BulkVerifyTab({ plan }: { plan: string }) {
   const [jobs, setJobs] = useState<BulkJob[]>([]);
   const [jobsLoading, setJobsLoading] = useState(true);
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<"email" | "domain" | "reputationScore" | "riskLevel">("email");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const fileRef = useRef<HTMLInputElement>(null);
+  const pollInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const parseEmails = useCallback((text: string) => {
     const list = text
@@ -1684,20 +1688,27 @@ function BulkVerifyTab({ plan }: { plan: string }) {
 
   useEffect(() => {
     if (activeJobId === null) return;
+    const stopPoll = () => {
+      if (pollInterval.current !== null) {
+        clearInterval(pollInterval.current);
+        pollInterval.current = null;
+      }
+    };
     const poll = () => {
       fetch(`/api/bulk-jobs/${activeJobId}`, { credentials: "include" })
         .then((r) => r.json())
         .then((job: BulkJob) => {
           setActiveJob(job);
           if (job.status === "done" || job.status === "failed") {
+            stopPoll();
             loadJobs();
           }
         })
         .catch(() => {});
     };
     poll();
-    const interval = setInterval(poll, 2000);
-    return () => clearInterval(interval);
+    pollInterval.current = setInterval(poll, 2000);
+    return stopPoll;
   }, [activeJobId, loadJobs]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1754,12 +1765,31 @@ function BulkVerifyTab({ plan }: { plan: string }) {
   const safeCount = results.filter((r) => !r.isDisposable && !r.error).length;
   const errorCount = results.filter((r) => !!r.error).length;
 
-  const filteredResults =
+  const handleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  };
+
+  const filteredResults = (
     filter === "all"
       ? results
       : filter === "disposable"
         ? results.filter((r) => r.isDisposable)
-        : results.filter((r) => !r.isDisposable && !r.error);
+        : results.filter((r) => !r.isDisposable && !r.error)
+  ).slice().sort((a, b) => {
+    let av: string | number = "";
+    let bv: string | number = "";
+    if (sortField === "email") { av = a.email; bv = b.email; }
+    else if (sortField === "domain") { av = a.domain ?? ""; bv = b.domain ?? ""; }
+    else if (sortField === "reputationScore") { av = a.reputationScore ?? 0; bv = b.reputationScore ?? 0; }
+    else if (sortField === "riskLevel") { av = a.riskLevel ?? ""; bv = b.riskLevel ?? ""; }
+    if (typeof av === "number") return sortDir === "asc" ? av - (bv as number) : (bv as number) - av;
+    return sortDir === "asc" ? av.localeCompare(bv as string) : (bv as string).localeCompare(av);
+  });
 
   if (limit === 0) {
     return (
@@ -1980,25 +2010,58 @@ function BulkVerifyTab({ plan }: { plan: string }) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border bg-muted/30">
-                      <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Email</th>
-                      <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Domain</th>
-                      <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Score</th>
-                      <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Result</th>
+                      {([
+                        { key: "email", label: "Email" },
+                        { key: "domain", label: "Domain" },
+                        { key: "reputationScore", label: "Score" },
+                        { key: "riskLevel", label: "Risk" },
+                        { key: null, label: "Disposable" },
+                        { key: null, label: "Tags" },
+                        { key: null, label: "Result" },
+                      ] as { key: typeof sortField | null; label: string }[]).map(({ key, label }) => (
+                        <th
+                          key={label}
+                          onClick={() => key && handleSort(key)}
+                          className={`px-4 py-2.5 font-medium text-muted-foreground text-left text-xs select-none ${key ? "cursor-pointer hover:text-foreground transition-colors" : ""}`}
+                        >
+                          {label}
+                          {key && sortField === key && (
+                            <span className="ml-1 opacity-60">{sortDir === "asc" ? "↑" : "↓"}</span>
+                          )}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
                     {filteredResults.map((row, i) => (
                       <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                        <td className="px-4 py-2.5 font-mono text-xs truncate max-w-[180px]">{row.email}</td>
+                        <td className="px-4 py-2.5 font-mono text-xs truncate max-w-[160px]">{row.email}</td>
                         <td className="px-4 py-2.5 text-muted-foreground text-xs">{row.domain ?? "—"}</td>
-                        <td className="px-4 py-2.5 text-center text-xs">
+                        <td className="px-4 py-2.5 text-xs">
                           {row.reputationScore !== undefined ? (
                             <span className={`font-semibold ${row.reputationScore >= 70 ? "text-destructive" : row.reputationScore >= 40 ? "text-yellow-500" : "text-green-500"}`}>
                               {row.reputationScore}
                             </span>
                           ) : "—"}
                         </td>
-                        <td className="px-4 py-2.5 text-center">
+                        <td className="px-4 py-2.5 text-xs capitalize text-muted-foreground">{row.riskLevel ?? "—"}</td>
+                        <td className="px-4 py-2.5 text-center text-xs">
+                          {row.isDisposable ? (
+                            <XCircle className="h-3.5 w-3.5 text-destructive mx-auto" />
+                          ) : (
+                            <CheckCircle className="h-3.5 w-3.5 text-green-500 mx-auto" />
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs max-w-[140px]">
+                          <div className="flex flex-wrap gap-1">
+                            {row.tags?.length
+                              ? row.tags.map((t) => (
+                                  <span key={t} className="inline-block px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-[10px]">{t}</span>
+                                ))
+                              : <span className="text-muted-foreground">—</span>}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5">
                           {row.error ? (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-xs">
                               Error

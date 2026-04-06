@@ -60,6 +60,7 @@ export interface AdminUserFull {
   requestCount: number;
   requestLimit: number;
   createdAt: string;
+  bulkJobCount?: number;
 }
 
 export interface AdminUsersFullResponse {

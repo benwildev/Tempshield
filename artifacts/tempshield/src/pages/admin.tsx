@@ -11,7 +11,7 @@ import {
   useAdminDeletePlanConfig, useAdminGetApiKeys,
   useAdminDeleteUser, useAdminResetUsage, useAdminRevokeKey,
 } from "@workspace/api-client-react";
-import type { PlanConfig } from "@workspace/api-client-react";
+import type { PlanConfig, AdminUserFull } from "@workspace/api-client-react";
 import {
   LayoutDashboard, Users, CreditCard, Settings, Key, Database,
   Shield, RefreshCw, Check, X, Loader2, Trash2, RotateCcw,
@@ -253,14 +253,14 @@ function UsersSection() {
             <table className="w-full text-sm text-left">
               <thead className="border-b border-border">
                 <tr>
-                  {["Name / Email", "Plan", "Usage", "Joined", "Actions"].map(h => (
+                  {["Name / Email", "Plan", "Usage", "Bulk Jobs", "Joined", "Actions"].map(h => (
                     <th key={h} className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {users.length === 0 ? (
-                  <tr><td colSpan={5} className="text-center py-10 text-muted-foreground text-sm">No users found.</td></tr>
+                  <tr><td colSpan={6} className="text-center py-10 text-muted-foreground text-sm">No users found.</td></tr>
                 ) : users.map(u => (
                   <tr key={u.id} className="border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors">
                     <td className="px-4 py-3">
@@ -284,6 +284,9 @@ function UsersSection() {
                       <div className="mt-1 h-1 w-20 rounded-full bg-border overflow-hidden">
                         <div className="h-1 rounded-full bg-primary" style={{ width: `${Math.min(100, (u.requestCount / u.requestLimit) * 100)}%` }} />
                       </div>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                      {(u as AdminUserFull & { bulkJobCount?: number }).bulkJobCount ?? 0}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{format(parseISO(u.createdAt), "PP")}</td>
                     <td className="px-4 py-3">

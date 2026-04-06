@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { Readable } from "stream";
-import { db, usersTable, apiUsageTable, domainsTable, upgradeRequestsTable, planConfigsTable, userWebsitesTable, userPagesTable, paymentSettingsTable } from "@workspace/db";
+import { db, usersTable, apiUsageTable, domainsTable, upgradeRequestsTable, planConfigsTable, userWebsitesTable, userPagesTable, paymentSettingsTable, bulkJobsTable } from "@workspace/db";
 import { eq, sql, count, desc, and, gte } from "drizzle-orm";
 import { z } from "zod";
 import { requireAdmin } from "../middlewares/session.js";
@@ -25,6 +25,7 @@ router.get("/users", requireAdmin, async (req, res) => {
       requestCount: usersTable.requestCount,
       requestLimit: usersTable.requestLimit,
       createdAt: usersTable.createdAt,
+      bulkJobCount: sql<number>`(SELECT COUNT(*) FROM bulk_jobs WHERE bulk_jobs.user_id = ${usersTable.id})::int`,
     })
     .from(usersTable)
     .orderBy(usersTable.createdAt);

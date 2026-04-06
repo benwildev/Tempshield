@@ -97,7 +97,7 @@ async function processJob(jobId: number): Promise<void> {
           processedCount: results.length,
           disposableCount,
           safeCount,
-          results: results as any,
+          results: results satisfies BulkJobResultItem[],
         })
         .where(eq(bulkJobsTable.id, jobId));
     }
@@ -110,7 +110,7 @@ async function processJob(jobId: number): Promise<void> {
         processedCount: results.length,
         disposableCount,
         safeCount,
-        results: results as any,
+        results: results satisfies BulkJobResultItem[],
       })
       .where(eq(bulkJobsTable.id, jobId));
   } catch (err) {
@@ -120,7 +120,7 @@ async function processJob(jobId: number): Promise<void> {
         status: "failed",
         errorMessage: err instanceof Error ? err.message : "Unknown error",
         completedAt: new Date(),
-        results: results as any,
+        results: results satisfies BulkJobResultItem[],
         processedCount: results.length,
         disposableCount,
         safeCount,
@@ -243,12 +243,12 @@ router.post("/bulk-jobs", async (req, res) => {
     .values({
       userId,
       status: "pending",
-      emails: emails as any,
+      emails: emails satisfies string[],
       totalEmails: emails.length,
       processedCount: 0,
       disposableCount: 0,
       safeCount: 0,
-      results: [] as any,
+      results: [] satisfies BulkJobResultItem[],
     })
     .returning({ id: bulkJobsTable.id });
 
