@@ -354,18 +354,26 @@ router.get("/bulk-jobs/:id/download", async (req, res) => {
 
   const results = (job.results as BulkJobResultItem[]) ?? [];
 
+  /** RFC-4180 CSV cell: wrap in quotes, escape embedded quotes by doubling them */
+  const csvCell = (val: string | number | boolean | null | undefined): string => {
+    if (val === null || val === undefined) return "";
+    const s = String(val);
+    if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+
   const header = "email,domain,is_disposable,reputation_score,risk_level,is_free_email,is_role_account,mx_valid,inbox_support,tags\n";
   const rows = results.map((r) => [
-    `"${r.email}"`,
-    `"${r.domain}"`,
+    csvCell(r.email),
+    csvCell(r.domain),
     r.isDisposable ? "true" : "false",
-    r.reputationScore,
-    `"${r.riskLevel}"`,
+    csvCell(r.reputationScore ?? ""),
+    csvCell(r.riskLevel ?? ""),
     r.isFreeEmail ? "true" : "false",
     r.isRoleAccount ? "true" : "false",
     r.mxValid === null ? "" : r.mxValid ? "true" : "false",
     r.inboxSupport === null ? "" : r.inboxSupport ? "true" : "false",
-    `"${(r.tags ?? []).join(";")}"`,
+    csvCell((r.tags ?? []).join(";")),
   ].join(",")).join("\n");
 
   const csv = header + rows;

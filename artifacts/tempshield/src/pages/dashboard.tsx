@@ -156,7 +156,7 @@ export default function DashboardPage() {
               {activeTab === "blocklist" && <BlocklistTab plan={data.user.plan} />}
               {activeTab === "audit" && <AuditLogTab />}
               {activeTab === "billing" && <BillingTab />}
-              {activeTab === "bulk" && <BulkVerifyTab plan={data.user.plan} />}
+              {activeTab === "bulk" && <BulkVerifyTab plan={data.user.plan} maxBulkEmails={data.planConfig.maxBulkEmails} />}
               {activeTab === "settings" && (
                 <SettingsTab planConfig={data.planConfig} plan={data.user.plan} />
               )}
@@ -1637,14 +1637,8 @@ interface BulkJob {
   completedAt: string | null;
 }
 
-const PLAN_BULK_LIMIT: Record<string, number> = {
-  FREE: 0,
-  BASIC: 100,
-  PRO: 500,
-};
-
-function BulkVerifyTab({ plan }: { plan: string }) {
-  const limit = PLAN_BULK_LIMIT[plan] ?? 0;
+function BulkVerifyTab({ plan, maxBulkEmails }: { plan: string; maxBulkEmails: number }) {
+  const limit = maxBulkEmails;
   const [inputMode, setInputMode] = useState<"paste" | "csv">("paste");
   const [emailsText, setEmailsText] = useState("");
   const [parsedEmails, setParsedEmails] = useState<string[]>([]);
@@ -1971,20 +1965,20 @@ function BulkVerifyTab({ plan }: { plan: string }) {
           {isDone && results.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: "Total", value: results.length, icon: Layers, color: "text-foreground" },
-                { label: "Disposable", value: disposableCount, icon: XCircle, color: "text-destructive" },
-                { label: "Safe", value: safeCount, icon: CheckCircle, color: "text-green-500" },
-                { label: "Errors", value: errorCount, icon: Minus, color: "text-muted-foreground" },
-              ].map(({ label, value, icon: Icon, color }) => (
+                { label: "Total Checked", value: results.length, icon: Layers, color: "text-foreground", pct: null },
+                { label: "Disposable Rate", value: disposableCount, icon: XCircle, color: "text-destructive", pct: results.length > 0 ? Math.round((disposableCount / results.length) * 100) : 0 },
+                { label: "Safe", value: safeCount, icon: CheckCircle, color: "text-green-500", pct: results.length > 0 ? Math.round((safeCount / results.length) * 100) : 0 },
+                { label: "Errors", value: errorCount, icon: Minus, color: "text-muted-foreground", pct: results.length > 0 ? Math.round((errorCount / results.length) * 100) : 0 },
+              ].map(({ label, value, icon: Icon, color, pct }) => (
                 <div key={label} className="rounded-xl border border-border bg-background p-3 space-y-1">
                   <div className="flex items-center gap-1.5">
                     <Icon className={`h-3.5 w-3.5 ${color}`} />
                     <span className="text-xs text-muted-foreground">{label}</span>
                   </div>
                   <p className={`text-xl font-bold ${color}`}>{value}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {results.length > 0 ? Math.round((value / results.length) * 100) : 0}%
-                  </p>
+                  {pct !== null && (
+                    <p className="text-xs text-muted-foreground">{pct}% of total</p>
+                  )}
                 </div>
               ))}
             </div>

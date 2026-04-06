@@ -102,6 +102,7 @@ router.get("/dashboard", requireAuth, async (req, res) => {
       pageLimit: planConfig.pageLimit,
       mxDetectionEnabled: planConfig.mxDetectionEnabled,
       inboxCheckEnabled: planConfig.inboxCheckEnabled,
+      maxBulkEmails: planConfig.maxBulkEmails,
     },
     counts: {
       namedApiKeys: Number(keyCount),

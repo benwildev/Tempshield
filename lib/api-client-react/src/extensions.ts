@@ -115,6 +115,7 @@ export interface DashboardPlanConfig {
   pageLimit: number;
   mxDetectionEnabled: boolean;
   inboxCheckEnabled: boolean;
+  maxBulkEmails: number;
 }
 
 export interface DashboardCounts {
