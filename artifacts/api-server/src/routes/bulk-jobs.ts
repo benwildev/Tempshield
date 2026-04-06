@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import {
   db,
@@ -8,7 +8,7 @@ import {
 } from "@workspace/db";
 import { eq, desc, inArray } from "drizzle-orm";
 import { getPlanConfig } from "../lib/auth.js";
-import { performChecks } from "./check-email.js";
+import { performChecks, maybeResetMonthlyUsage } from "./check-email.js";
 
 const router = Router();
 
@@ -31,13 +31,14 @@ async function processJob(jobId: number): Promise<void> {
     .set({ status: "processing" })
     .where(eq(bulkJobsTable.id, jobId));
 
-  const planConfig = await getPlanConfig(
-    (await db
-      .select({ plan: usersTable.plan })
-      .from(usersTable)
-      .where(eq(usersTable.id, job.userId))
-      .limit(1))[0]?.plan ?? "FREE"
-  );
+  const [userSettings] = await db
+    .select({ plan: usersTable.plan, blockFreeEmails: usersTable.blockFreeEmails })
+    .from(usersTable)
+    .where(eq(usersTable.id, job.userId))
+    .limit(1);
+
+  const planConfig = await getPlanConfig(userSettings?.plan ?? "FREE");
+  const blockFreeEmails = userSettings?.blockFreeEmails ?? false;
 
   const emails = (job.emails as string[]) ?? [];
   const results: BulkJobResultItem[] = [];
@@ -53,10 +54,11 @@ async function processJob(jobId: number): Promise<void> {
         batch.map(async (email) => {
           try {
             const r = await performChecks(email, job.userId, planConfig);
+            const isDisposable = r.disposable || (blockFreeEmails && r.isFreeEmail);
             return {
               email,
               domain: r.domain,
-              isDisposable: r.disposable,
+              isDisposable,
               reputationScore: r.reputationScore,
               riskLevel: r.riskLevel,
               tags: r.tags,
@@ -166,13 +168,12 @@ const createBulkJobSchema = z.object({
   emails: z.array(z.string().email()).min(1).max(1000),
 });
 
-function requireSession(req: any, res: any): number | null {
-  const userId = req.userId as number | undefined;
-  if (!userId) {
+function requireSession(req: Request, res: Response): number | null {
+  if (!req.userId) {
     res.status(401).json({ error: "Authentication required" });
     return null;
   }
-  return userId;
+  return req.userId;
 }
 
 // POST /api/bulk-jobs — create a new bulk job
@@ -181,7 +182,12 @@ router.post("/bulk-jobs", async (req, res) => {
   if (!userId) return;
 
   const [user] = await db
-    .select({ plan: usersTable.plan, requestCount: usersTable.requestCount, requestLimit: usersTable.requestLimit })
+    .select({
+      plan: usersTable.plan,
+      requestCount: usersTable.requestCount,
+      requestLimit: usersTable.requestLimit,
+      usagePeriodStart: usersTable.usagePeriodStart,
+    })
     .from(usersTable)
     .where(eq(usersTable.id, userId))
     .limit(1);
@@ -218,7 +224,14 @@ router.post("/bulk-jobs", async (req, res) => {
     return;
   }
 
-  const remaining = (planConfig.requestLimit ?? 0) - user.requestCount;
+  // Reset monthly usage if we've rolled into a new billing period
+  const currentRequestCount = await maybeResetMonthlyUsage(
+    userId,
+    user.usagePeriodStart,
+    user.requestCount
+  );
+
+  const remaining = (planConfig.requestLimit ?? 0) - currentRequestCount;
   if (remaining <= 0) {
     res.status(429).json({ error: "Monthly request limit reached. Upgrade your plan for more." });
     return;
@@ -235,7 +248,7 @@ router.post("/bulk-jobs", async (req, res) => {
   // Deduct quota upfront
   await db
     .update(usersTable)
-    .set({ requestCount: user.requestCount + emails.length })
+    .set({ requestCount: currentRequestCount + emails.length })
     .where(eq(usersTable.id, userId));
 
   const [job] = await db

@@ -286,7 +286,7 @@ function UsersSection() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {(u as AdminUserFull & { bulkJobCount?: number }).bulkJobCount ?? 0}
+                      {u.bulkJobCount ?? 0}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{format(parseISO(u.createdAt), "PP")}</td>
                     <td className="px-4 py-3">

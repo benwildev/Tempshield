@@ -97,7 +97,7 @@ interface AuthResult {
   blockFreeEmails: boolean;
 }
 
-async function maybeResetMonthlyUsage(
+export async function maybeResetMonthlyUsage(
   userId: number,
   usagePeriodStart: Date,
   requestCount: number
