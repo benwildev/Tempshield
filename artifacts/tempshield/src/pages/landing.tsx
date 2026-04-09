@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { Navbar, Footer } from "@/components/Layout";
 import {
@@ -13,6 +13,12 @@ import {
   Terminal,
   Copy,
   Check,
+  Download,
+  Puzzle,
+  ListChecks,
+  Activity,
+  Bell,
+  Database,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { isValidEmail } from "@/utils/email-validation";
@@ -248,6 +254,301 @@ function buildLandingFeatures(
   if (data.mxDetectionEnabled) features.push("MX record verification");
   if (data.inboxCheckEnabled) features.push("Inbox detection");
   return [...features, ...(PLAN_STATIC[planKey]?.staticFeatures ?? [])];
+}
+
+// ── WordPress plugin section data ─────────────────────────────────────────────
+
+const WP_FEATURES = [
+  {
+    icon: Puzzle,
+    title: "10 Form Integrations",
+    desc: "WooCommerce, CF7, WPForms, Gravity Forms, Elementor, Ninja Forms, Fluent Forms, and WordPress core forms — all covered out of the box.",
+  },
+  {
+    icon: Database,
+    title: "24-Hour Result Cache",
+    desc: "API results are cached in WordPress transients for 24 hours. Repeat submissions are instant and don't consume your quota.",
+  },
+  {
+    icon: ListChecks,
+    title: "Allow / Block Lists",
+    desc: "Manually allowlist your company domain or blocklist known bad actors — overrides the API for full local control.",
+  },
+  {
+    icon: Activity,
+    title: "Activity Log",
+    desc: "Every email check is recorded with outcome, reason, and form name. The last 1,000 entries are kept and searchable.",
+  },
+  {
+    icon: Bell,
+    title: "Admin Notifications",
+    desc: "Get an email alert the moment a form submission is blocked — so nothing slips through unnoticed.",
+  },
+  {
+    icon: Code2,
+    title: "WP REST API Endpoint",
+    desc: "Use /wp-json/leadcop/v1/check from themes, page builders, or headless WordPress. Auth via your API key.",
+  },
+];
+
+const WP_INTEGRATIONS = [
+  { name: "WooCommerce", color: "#7f54b3" },
+  { name: "Contact Form 7", color: "#e44b2b" },
+  { name: "WPForms", color: "#e27730" },
+  { name: "Gravity Forms", color: "#f7941d" },
+  { name: "Elementor Pro", color: "#92003b" },
+  { name: "Ninja Forms", color: "#dd3333" },
+  { name: "Fluent Forms", color: "#1b6ef3" },
+  { name: "WP Registration", color: "#2271b1" },
+  { name: "WP Comments", color: "#3858e9" },
+];
+
+const WP_STEPS = [
+  {
+    step: "01",
+    title: "Download & Upload",
+    desc: "Download the plugin zip and upload it via Plugins → Add New → Upload Plugin in your WordPress admin.",
+  },
+  {
+    step: "02",
+    title: "Activate",
+    desc: "Click Activate. LeadCop will appear in your admin sidebar. The log table is created automatically on first run.",
+  },
+  {
+    step: "03",
+    title: "Enter Your API Key",
+    desc: "Go to LeadCop → General, paste your API key, and save. All 10 integrations are enabled and protecting forms immediately.",
+  },
+];
+
+// WordPress logo SVG
+function WpLogoIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zM3.952 12c0-1.244.265-2.428.736-3.5L8.47 20.18C5.8 18.74 3.952 15.577 3.952 12zm8.048 8.048c-.84 0-1.65-.12-2.41-.34l2.56-7.44 2.62 7.18c.017.043.038.083.06.12a8.1 8.1 0 01-2.83.48zm1.17-12.316l2.312 6.875-6.43-1.96.65-1.95 1.21.18c.56 0 1.02-.46 1.02-1.02 0-.56-.46-1.02-1.02-1.02l-1.63.04.1-.19 2.13-5.99c.3-.04.6-.06.91-.06.64 0 1.27.09 1.87.23-.01.01-.01.02-.01.03l-.94 1.88zm2.76 7.596l2.24-6.5 1.02 3.42c.19.64.37 1.38.37 1.84 0 .73-.1 1.4-.28 2.04a8.07 8.07 0 01-1.47.85c-.57-.22-1.05-.42-1.87-.65zm2.71-11.6c.28.55.46 1.19.46 1.93 0 .65-.12 1.3-.46 2.12l-1.3 3.74-2.33-6.78 1.28-3.8c.46.28.86.57 1.13 1.03-.01.18-.01.36-.01.55 0 .56.46.96 1.01.96.2 0 .38-.06.34 0l.1 2.24z" />
+    </svg>
+  );
+}
+
+const LOG_ENTRIES = [
+  { email: "user@mailinator.com", outcome: "blocked" as const, reason: "disposable", form: "woo checkout", time: "14:23" },
+  { email: "john@gmail.com", outcome: "warned" as const, reason: "free email", form: "contact form 7", time: "14:22" },
+  { email: "alice@company.io", outcome: "allowed" as const, reason: "", form: "wp register", time: "14:20" },
+  { email: "spam@tempmail.org", outcome: "blocked" as const, reason: "disposable", form: "wpforms", time: "14:18" },
+];
+
+const OUTCOME_COLORS = {
+  blocked: { text: "#dc2626", bg: "#fef2f2", label: "blocked" },
+  warned: { text: "#d97706", bg: "#fffbeb", label: "warned" },
+  allowed: { text: "#16a34a", bg: "#f0fdf4", label: "allowed" },
+};
+
+const MOCK_TOGGLES = [
+  { label: "WooCommerce Checkout", on: true },
+  { label: "Contact Form 7", on: true },
+  { label: "WPForms", on: true },
+  { label: "Gravity Forms", on: false },
+  { label: "Elementor Pro Forms", on: true },
+  { label: "Ninja Forms", on: true },
+];
+
+function AdminPanelMockup() {
+  const [activeTab, setActiveTab] = useState("integrations");
+  const [visibleLog, setVisibleLog] = useState<number>(0);
+  const [toggleStates, setToggleStates] = useState<boolean[]>(MOCK_TOGGLES.map((t) => t.on));
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Auto-cycle tabs
+  useEffect(() => {
+    const order = ["integrations", "log", "general"];
+    let i = 0;
+    timerRef.current = setInterval(() => {
+      i = (i + 1) % order.length;
+      setActiveTab(order[i]);
+    }, 3000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, []);
+
+  // Animate log entries in when log tab is active
+  useEffect(() => {
+    if (activeTab !== "log") { setVisibleLog(0); return; }
+    setVisibleLog(0);
+    let n = 0;
+    const t = setInterval(() => {
+      n += 1;
+      setVisibleLog(n);
+      if (n >= LOG_ENTRIES.length) clearInterval(t);
+    }, 350);
+    return () => clearInterval(t);
+  }, [activeTab]);
+
+  const tabs = ["general", "integrations", "log"];
+
+  return (
+    <div className="relative rounded-2xl overflow-hidden border border-border/60 bg-card shadow-2xl shadow-black/20">
+      {/* Browser chrome */}
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-muted/50">
+        <div className="flex gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-full bg-red-400/80" />
+          <div className="w-2.5 h-2.5 rounded-full bg-yellow-400/80" />
+          <div className="w-2.5 h-2.5 rounded-full bg-green-400/80" />
+        </div>
+        <div className="flex-1 mx-3 rounded-md bg-background/60 px-3 py-1 text-[10px] text-muted-foreground font-mono truncate">
+          /wp-admin/admin.php?page=leadcop&tab={activeTab}
+        </div>
+      </div>
+
+      {/* Plugin header bar */}
+      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border/40 bg-muted/20">
+        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10">
+          <Shield className="h-4 w-4 text-primary" />
+        </div>
+        <span className="text-sm font-semibold text-foreground">LeadCop Email Validator</span>
+        <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+          v1.1.0
+        </span>
+      </div>
+
+      {/* Tab navigation */}
+      <div className="flex border-b border-border/40 bg-muted/10 px-1">
+        {tabs.map((tab) => (
+          <button
+            key={tab}
+            onClick={() => {
+              setActiveTab(tab);
+              if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+            }}
+            className={`px-4 py-2.5 text-[11px] font-medium capitalize border-b-2 -mb-px transition-all ${
+              activeTab === tab
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab === "log" ? "Activity Log" : tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      <div className="min-h-[240px] p-4">
+        <AnimatePresence mode="wait">
+          {activeTab === "integrations" && (
+            <motion.div
+              key="integrations"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-2.5"
+            >
+              <p className="text-[10px] text-muted-foreground mb-3">
+                Choose which form plugins LeadCop validates:
+              </p>
+              {MOCK_TOGGLES.map((toggle, i) => (
+                <motion.div
+                  key={toggle.label}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/20 px-3 py-2"
+                >
+                  <span className="text-[11px] text-foreground">{toggle.label}</span>
+                  <button
+                    onClick={() => setToggleStates((s) => s.map((v, idx) => idx === i ? !v : v))}
+                    className={`relative h-4 w-7 rounded-full transition-colors duration-300 ${
+                      toggleStates[i] ? "bg-primary" : "bg-muted-foreground/30"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform duration-300 ${
+                        toggleStates[i] ? "translate-x-3.5" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
+
+          {activeTab === "log" && (
+            <motion.div
+              key="log"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-2"
+            >
+              <p className="text-[10px] text-muted-foreground mb-3">
+                Recent email checks — last 1,000 entries kept
+              </p>
+              <div className="rounded-lg border border-border/40 overflow-hidden">
+                <div className="grid grid-cols-4 gap-2 px-3 py-1.5 bg-muted/40 text-[9px] font-semibold text-muted-foreground uppercase tracking-wide">
+                  <span>Email</span>
+                  <span>Outcome</span>
+                  <span>Form</span>
+                  <span>Time</span>
+                </div>
+                {LOG_ENTRIES.slice(0, visibleLog).map((entry, i) => {
+                  const c = OUTCOME_COLORS[entry.outcome];
+                  return (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="grid grid-cols-4 gap-2 px-3 py-1.5 text-[10px] border-t border-border/30"
+                    >
+                      <span className="font-mono truncate text-foreground/80">{entry.email}</span>
+                      <span className="font-semibold" style={{ color: c.text }}>{c.label}</span>
+                      <span className="text-muted-foreground">{entry.form}</span>
+                      <span className="text-muted-foreground">{entry.time}</span>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === "general" && (
+            <motion.div
+              key="general"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                  API Key
+                </label>
+                <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
+                  <span className="font-mono text-[11px] text-foreground/60 flex-1">lk_••••••••••••••••••••••</span>
+                  <Check className="h-3.5 w-3.5 text-green-500" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                  Disposable Emails
+                </label>
+                <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+                  <span className="text-[11px] text-foreground">Block disposable / burner emails</span>
+                  <div className="relative h-4 w-7 rounded-full bg-primary">
+                    <span className="absolute top-0.5 right-0.5 h-3 w-3 rounded-full bg-white shadow" />
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-lg border border-border/40 bg-muted/10 px-3 py-2 flex items-center gap-2">
+                <Activity className="h-3.5 w-3.5 text-primary/60" />
+                <span className="text-[11px] text-muted-foreground">Activity log: </span>
+                <span className="text-[11px] font-semibold text-foreground">347 checks today</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
 }
 
 function CopyButton({ code }: { code: string }) {
@@ -736,6 +1037,179 @@ export default function LandingPage() {
               );
             })}
           </div>
+        </div>
+      </section>
+
+      {/* ── WORDPRESS PLUGIN ─────────────────────────────── */}
+      <section className="relative py-28 px-6 overflow-hidden">
+        {/* Layered background */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-primary/[0.04] to-transparent" />
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute left-1/2 top-1/2 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#2271b1]/5 blur-[120px]" />
+        </div>
+
+        <div className="relative mx-auto max-w-6xl">
+
+          {/* ── Section header ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="mb-20 text-center"
+          >
+            <div className="mb-5 inline-flex items-center gap-2.5 rounded-full border border-[#2271b1]/30 bg-[#2271b1]/10 px-4 py-1.5">
+              <WpLogoIcon className="h-4 w-4 text-[#2271b1]" />
+              <span className="text-xs font-semibold text-[#2271b1]">WordPress Plugin</span>
+            </div>
+            <h2 className="font-heading text-3xl font-bold text-foreground md:text-5xl">
+              First-Class{" "}
+              <span className="bg-gradient-to-r from-[#2271b1] to-primary bg-clip-text text-transparent">
+                WordPress
+              </span>{" "}
+              Integration
+            </h2>
+            <p className="mx-auto mt-5 max-w-xl text-muted-foreground">
+              Install the plugin once. Every form on your site is protected automatically — no code, no configuration, no maintenance.
+            </p>
+          </motion.div>
+
+          {/* ── Two-column: features + mockup ── */}
+          <div className="grid gap-16 lg:grid-cols-2 items-center mb-24">
+
+            {/* Left: feature list */}
+            <motion.div
+              initial={{ opacity: 0, x: -24 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.55 }}
+            >
+              <ul className="space-y-5">
+                {WP_FEATURES.map((f, i) => (
+                  <motion.li
+                    key={f.title}
+                    initial={{ opacity: 0, x: -16 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.07, duration: 0.4 }}
+                    className="flex gap-4"
+                  >
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                      <f.icon className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-foreground text-sm">{f.title}</p>
+                      <p className="mt-1 text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+                    </div>
+                  </motion.li>
+                ))}
+              </ul>
+
+              {/* CTAs */}
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.5, duration: 0.4 }}
+                className="mt-10 flex flex-wrap gap-3"
+              >
+                <a
+                  href="/downloads/leadcop-email-validator.zip"
+                  download
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#2271b1] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#2271b1]/20 transition-all hover:bg-[#1d5e9a] hover:-translate-y-0.5"
+                >
+                  <Download className="h-4 w-4" />
+                  Download Plugin (Free)
+                </a>
+                <Link
+                  href="/docs#wordpress"
+                  className="inline-flex items-center gap-2 rounded-lg border border-border px-5 py-2.5 text-sm font-semibold text-foreground transition-all hover:bg-muted"
+                >
+                  View Setup Guide
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </motion.div>
+            </motion.div>
+
+            {/* Right: admin panel mockup */}
+            <motion.div
+              initial={{ opacity: 0, x: 24, rotateY: 6 }}
+              whileInView={{ opacity: 1, x: 0, rotateY: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+              style={{ perspective: 1000 }}
+            >
+              <AdminPanelMockup />
+            </motion.div>
+          </div>
+
+          {/* ── Integration logos ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="mb-20 text-center"
+          >
+            <p className="mb-6 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Works with every major WordPress form plugin
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {WP_INTEGRATIONS.map((intg, i) => (
+                <motion.span
+                  key={intg.name}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.06, duration: 0.35, ease: "backOut" }}
+                  whileHover={{ scale: 1.07, y: -2 }}
+                  className="inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-semibold shadow-sm transition-shadow hover:shadow-md cursor-default"
+                  style={{
+                    borderColor: intg.color + "40",
+                    backgroundColor: intg.color + "12",
+                    color: intg.color,
+                  }}
+                >
+                  <span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ backgroundColor: intg.color }}
+                  />
+                  {intg.name}
+                </motion.span>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* ── 3-step install guide ── */}
+          <div className="grid gap-6 md:grid-cols-3">
+            {WP_STEPS.map((step, i) => (
+              <motion.div
+                key={step.step}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1, duration: 0.45 }}
+                className="glass-card group relative rounded-2xl p-6 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
+              >
+                {/* Step connector line (between cards) */}
+                {i < 2 && (
+                  <div className="pointer-events-none absolute -right-3 top-1/2 hidden -translate-y-1/2 md:block">
+                    <ArrowRight className="h-5 w-5 text-border" />
+                  </div>
+                )}
+                <div className="mb-4 font-heading text-4xl font-bold text-primary/20 leading-none">
+                  {step.step}
+                </div>
+                <h3 className="font-heading text-base font-semibold text-foreground mb-2">
+                  {step.title}
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {step.desc}
+                </p>
+              </motion.div>
+            ))}
+          </div>
+
         </div>
       </section>
 
