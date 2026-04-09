@@ -48,16 +48,70 @@ class LeadCop_Hooks {
             add_filter( 'gform_field_validation', array( __CLASS__, 'validate_gravity_email' ), 10, 4 );
             add_filter( 'gform_confirmation', array( __CLASS__, 'render_gravity_warn' ), 10, 4 );
         }
+
+        // ── Elementor Pro Forms ───────────────────────────────────────────────
+        if ( get_option( 'leadcop_hook_elementor', '1' ) === '1' ) {
+            add_action( 'elementor_pro/forms/validation', array( __CLASS__, 'validate_elementor_form' ), 10, 2 );
+            add_action( 'wp_footer', array( __CLASS__, 'render_generic_warn_footer' ) );
+        }
+
+        // ── Ninja Forms ───────────────────────────────────────────────────────
+        if ( class_exists( 'Ninja_Forms' ) && get_option( 'leadcop_hook_ninjaforms', '1' ) === '1' ) {
+            add_filter( 'ninja_forms_submit_data', array( __CLASS__, 'validate_ninjaforms' ) );
+            // warn footer registered once (shared with Elementor above if not already added)
+            if ( get_option( 'leadcop_hook_elementor', '1' ) !== '1' ) {
+                add_action( 'wp_footer', array( __CLASS__, 'render_generic_warn_footer' ) );
+            }
+        }
+
+        // ── Fluent Forms ──────────────────────────────────────────────────────
+        if ( defined( 'FLUENTFORM' ) && get_option( 'leadcop_hook_fluentforms', '1' ) === '1' ) {
+            add_filter( 'fluentform/validate_input_item_input_email', array( __CLASS__, 'validate_fluentforms_email' ), 10, 5 );
+            add_filter( 'fluentform/validate_input_item_email',       array( __CLASS__, 'validate_fluentforms_email' ), 10, 5 );
+            if ( get_option( 'leadcop_hook_elementor', '1' ) !== '1' && ! class_exists( 'Ninja_Forms' ) ) {
+                add_action( 'wp_footer', array( __CLASS__, 'render_generic_warn_footer' ) );
+            }
+        }
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private static function get_decision( $email ) {
+    /**
+     * Get (or build) the validation decision for an email address.
+     * Results are cached per-request. Logging and admin notifications are
+     * triggered here so no individual hook needs to handle them.
+     *
+     * @param string $email
+     * @param string $form  Human-readable identifier for the log (e.g. 'woo_checkout').
+     * @return array  { block: bool, warn: bool, message: string, reason: string }
+     */
+    private static function get_decision( $email, $form = '' ) {
         $email = sanitize_email( $email );
+
         if ( ! isset( self::$decision_cache[ $email ] ) ) {
-            $result = LeadCop_API::check_email( $email );
-            self::$decision_cache[ $email ] = LeadCop_API::evaluate( $result );
+            // 1. Check local allowlist / blocklist first.
+            $decision = LeadCop_API::check_lists( $email );
+
+            // 2. Fall through to the API if not on any list.
+            if ( $decision === null ) {
+                $result   = LeadCop_API::check_email( $email );
+                $decision = LeadCop_API::evaluate( $result );
+            }
+
+            self::$decision_cache[ $email ] = $decision;
+
+            // 3. Log (if logging is enabled).
+            if ( get_option( 'leadcop_enable_log', '1' ) === '1' ) {
+                $outcome = $decision['block'] ? 'blocked' : ( $decision['warn'] ? 'warned' : 'allowed' );
+                LeadCop_Log::insert( $email, $outcome, $decision['reason'], $form );
+            }
+
+            // 4. Admin email notification on block.
+            if ( $decision['block'] && get_option( 'leadcop_notify_admin', '0' ) === '1' ) {
+                self::send_admin_notification( $email, $decision, $form );
+            }
         }
+
         return self::$decision_cache[ $email ];
     }
 
@@ -65,18 +119,32 @@ class LeadCop_Hooks {
         return 'color:#92400e;background:#fffbeb;border:1px solid #fcd34d;padding:10px 14px;border-radius:6px;margin:12px 0;font-size:0.9em;';
     }
 
-    // ── WordPress registration ────────────────────────────────────────────────────
+    private static function send_admin_notification( $email, $decision, $form ) {
+        $to      = get_option( 'leadcop_notify_email', get_option( 'admin_email' ) );
+        $subject = sprintf( __( '[LeadCop] Blocked email on %s', 'leadcop' ), get_bloginfo( 'name' ) );
+        $body    = sprintf(
+            /* translators: 1: email, 2: form, 3: reason, 4: message */
+            __( "LeadCop blocked an email address.\n\nEmail:  %1\$s\nForm:   %2\$s\nReason: %3\$s\nMessage shown: %4\$s\n\nSite: %5\$s", 'leadcop' ),
+            $email,
+            $form ?: __( 'unknown', 'leadcop' ),
+            $decision['reason'],
+            $decision['message'],
+            home_url()
+        );
+        wp_mail( $to, $subject, $body );
+    }
+
+    // ── WordPress registration ────────────────────────────────────────────────
 
     public static function validate_wp_register( $errors, $sanitized_user_login, $user_email ) {
         if ( $errors->get_error_code() ) {
             return $errors;
         }
-        $d = self::get_decision( $user_email );
+        $d = self::get_decision( $user_email, 'wp_register' );
         if ( $d['block'] ) {
             $errors->add( 'leadcop_email_error', esc_html( $d['message'] ) );
         } elseif ( $d['warn'] ) {
-            // Successful registration redirects to wp-login.php; surface the
-            // warning there via the login_message filter using a short-lived transient.
+            // Surface warning on the wp-login.php confirmation page via a transient.
             $key = 'leadcop_rwarn_' . substr( md5( microtime() . wp_rand() ), 0, 8 );
             set_transient( $key, $d['message'], 120 );
             set_transient( 'leadcop_rwarn_key', $key, 120 );
@@ -98,19 +166,16 @@ class LeadCop_Hooks {
         return $message;
     }
 
-    // ── WordPress comments ────────────────────────────────────────────────────────
+    // ── WordPress comments ────────────────────────────────────────────────────
 
     public static function validate_wp_comment( $commentdata ) {
         if ( empty( $commentdata['comment_author_email'] ) ) {
             return $commentdata;
         }
-        $d = self::get_decision( $commentdata['comment_author_email'] );
+        $d = self::get_decision( $commentdata['comment_author_email'], 'wp_comment' );
         if ( $d['block'] ) {
             wp_die( esc_html( $d['message'] ), esc_html__( 'Email Error', 'leadcop' ), array( 'back_link' => true ) );
         } elseif ( $d['warn'] ) {
-            // Comment is allowed. Store the warning message so it can be set as
-            // a cookie in comment_post (which fires before the redirect), then
-            // rendered as a visible banner on the destination page via wp_footer.
             self::$comment_warn_msg = $d['message'];
             add_action( 'comment_post', array( __CLASS__, 'set_comment_warn_cookie' ), 5 );
         }
@@ -121,7 +186,6 @@ class LeadCop_Hooks {
         if ( ! self::$comment_warn_msg ) {
             return;
         }
-        // Cookie lasts 60 s — enough to survive the post-comment redirect.
         setcookie(
             'leadcop_cwarn',
             self::$comment_warn_msg,
@@ -133,17 +197,11 @@ class LeadCop_Hooks {
         );
     }
 
-    /**
-     * Render the comment warning as a banner on the page the user lands on
-     * after submitting their comment (wp_footer on the destination page).
-     * Uses a small JS snippet so the banner appears near the comments section.
-     */
     public static function render_comment_warn_footer() {
         if ( empty( $_COOKIE['leadcop_cwarn'] ) ) {
             return;
         }
         $msg = sanitize_text_field( wp_unslash( $_COOKIE['leadcop_cwarn'] ) );
-        // Clear the cookie immediately.
         setcookie( 'leadcop_cwarn', '', time() - 3600, defined( 'COOKIEPATH' ) ? COOKIEPATH : '/' );
         $style = esc_js( self::warn_style() );
         $json  = wp_json_encode( $msg );
@@ -159,14 +217,14 @@ class LeadCop_Hooks {
 </script>\n";
     }
 
-    // ── WooCommerce checkout ──────────────────────────────────────────────────────
+    // ── WooCommerce checkout ──────────────────────────────────────────────────
 
     public static function validate_woo_checkout() {
         $email = isset( $_POST['billing_email'] ) ? sanitize_email( wp_unslash( $_POST['billing_email'] ) ) : '';
         if ( ! $email ) {
             return;
         }
-        $d = self::get_decision( $email );
+        $d = self::get_decision( $email, 'woo_checkout' );
         if ( $d['block'] ) {
             wc_add_notice( esc_html( $d['message'] ), 'error' );
         } elseif ( $d['warn'] ) {
@@ -174,13 +232,13 @@ class LeadCop_Hooks {
         }
     }
 
-    // ── WooCommerce My Account registration ──────────────────────────────────────
+    // ── WooCommerce My Account registration ──────────────────────────────────
 
     public static function validate_woo_register( $errors, $username, $email ) {
         if ( $errors->get_error_code() ) {
             return $errors;
         }
-        $d = self::get_decision( $email );
+        $d = self::get_decision( $email, 'woo_account' );
         if ( $d['block'] ) {
             $errors->add( 'leadcop_email_error', esc_html( $d['message'] ) );
         } elseif ( $d['warn'] ) {
@@ -189,27 +247,22 @@ class LeadCop_Hooks {
         return $errors;
     }
 
-    // ── Contact Form 7 ────────────────────────────────────────────────────────────
+    // ── Contact Form 7 ────────────────────────────────────────────────────────
 
     public static function validate_cf7_email( $result, $tag ) {
         $email = isset( $_POST[ $tag->name ] ) ? sanitize_email( wp_unslash( $_POST[ $tag->name ] ) ) : '';
         if ( ! $email ) {
             return $result;
         }
-        $d = self::get_decision( $email );
+        $d = self::get_decision( $email, 'cf7' );
         if ( $d['block'] ) {
             $result->invalidate( $tag, esc_html( $d['message'] ) );
         } elseif ( $d['warn'] ) {
-            // Store for render_cf7_warn(); both hooks run in the same AJAX request.
             self::$cf7_warn = $d['message'];
         }
         return $result;
     }
 
-    /**
-     * Append warning text to the CF7 success response output shown to the user.
-     * Fires via the wpcf7_form_response_output filter during AJAX response rendering.
-     */
     public static function render_cf7_warn( $output, $class, $content, $form ) {
         if ( self::$cf7_warn && false !== strpos( $class, 'sent' ) ) {
             $output .= '<p class="leadcop-warn-msg" style="' . self::warn_style() . '">' . esc_html( self::$cf7_warn ) . '</p>';
@@ -218,14 +271,14 @@ class LeadCop_Hooks {
         return $output;
     }
 
-    // ── WPForms ───────────────────────────────────────────────────────────────────
+    // ── WPForms ───────────────────────────────────────────────────────────────
 
     public static function validate_wpforms_email( $field_id, $field_submit, $form_data ) {
         $email = sanitize_email( $field_submit );
         if ( ! $email ) {
             return;
         }
-        $d = self::get_decision( $email );
+        $d = self::get_decision( $email, 'wpforms' );
         if ( $d['block'] ) {
             wpforms()->process->errors[ $form_data['id'] ][ $field_id ] = esc_html( $d['message'] );
         } elseif ( $d['warn'] ) {
@@ -233,10 +286,6 @@ class LeadCop_Hooks {
         }
     }
 
-    /**
-     * Append warning text to the WPForms confirmation message shown to the user.
-     * Fires via the wpforms_confirmation_message filter.
-     */
     public static function render_wpforms_warn( $message, $form_data, $fields, $entry_id ) {
         $form_id = $form_data['id'];
         if ( ! empty( self::$wpforms_warn[ $form_id ] ) ) {
@@ -247,7 +296,7 @@ class LeadCop_Hooks {
         return $message;
     }
 
-    // ── Gravity Forms ─────────────────────────────────────────────────────────────
+    // ── Gravity Forms ─────────────────────────────────────────────────────────
 
     public static function validate_gravity_email( $result, $value, $form, $field ) {
         if ( $field->type !== 'email' ) {
@@ -257,7 +306,7 @@ class LeadCop_Hooks {
         if ( ! $email ) {
             return $result;
         }
-        $d = self::get_decision( $email );
+        $d = self::get_decision( $email, 'gravity_forms' );
         if ( $d['block'] ) {
             $result['is_valid'] = false;
             $result['message']  = esc_html( $d['message'] );
@@ -267,18 +316,13 @@ class LeadCop_Hooks {
         return $result;
     }
 
-    /**
-     * Append warning text to the Gravity Forms confirmation message shown to the user.
-     * Fires via the gform_confirmation filter after successful submission.
-     */
     public static function render_gravity_warn( $confirmation, $form, $entry, $ajax ) {
         $form_id = $form['id'];
         if ( ! empty( self::$gf_warn[ $form_id ] ) ) {
-            $warn = self::$gf_warn[ $form_id ];
+            $warn   = self::$gf_warn[ $form_id ];
             unset( self::$gf_warn[ $form_id ] );
             $inline = '<p class="leadcop-warn-msg" style="' . self::warn_style() . '">' . esc_html( $warn ) . '</p>';
             if ( is_array( $confirmation ) ) {
-                // Redirect-type confirmation; append to message if present.
                 if ( isset( $confirmation['message'] ) ) {
                     $confirmation['message'] .= $inline;
                 }
@@ -287,5 +331,115 @@ class LeadCop_Hooks {
             }
         }
         return $confirmation;
+    }
+
+    // ── Elementor Pro Forms ───────────────────────────────────────────────────
+
+    /**
+     * @param \ElementorPro\Modules\Forms\Classes\Form_Record $record
+     * @param \ElementorPro\Modules\Forms\Classes\Ajax_Handler $ajax_handler
+     */
+    public static function validate_elementor_form( $record, $ajax_handler ) {
+        $fields = $record->get_field( array( 'type' => 'email' ) );
+        if ( empty( $fields ) ) {
+            return;
+        }
+        foreach ( $fields as $id => $field ) {
+            $email = sanitize_email( $field['value'] );
+            if ( ! $email ) {
+                continue;
+            }
+            $d = self::get_decision( $email, 'elementor_forms' );
+            if ( $d['block'] ) {
+                $ajax_handler->add_error( $id, esc_html( $d['message'] ) );
+            } elseif ( $d['warn'] ) {
+                self::set_generic_warn_cookie( $d['message'] );
+            }
+        }
+    }
+
+    // ── Ninja Forms ───────────────────────────────────────────────────────────
+
+    public static function validate_ninjaforms( $form_data ) {
+        foreach ( $form_data['fields'] as $key => $field ) {
+            if ( ! in_array( $field['type'], array( 'email', 'email-confirm' ), true ) ) {
+                continue;
+            }
+            $email = sanitize_email( isset( $field['value'] ) ? $field['value'] : '' );
+            if ( ! $email ) {
+                continue;
+            }
+            $d = self::get_decision( $email, 'ninja_forms' );
+            if ( $d['block'] ) {
+                $form_data['errors']['fields'][ $field['id'] ] = esc_html( $d['message'] );
+            } elseif ( $d['warn'] ) {
+                self::set_generic_warn_cookie( $d['message'] );
+            }
+        }
+        return $form_data;
+    }
+
+    // ── Fluent Forms ──────────────────────────────────────────────────────────
+
+    /**
+     * @param  string|array $error   Existing error (string message or array).
+     * @param  array        $field
+     * @param  array        $formData
+     * @param  array        $fields
+     * @param  object       $form
+     * @return string|array  Error message or original $error if clean.
+     */
+    public static function validate_fluentforms_email( $error, $field, $formData, $fields, $form ) {
+        $field_key = $field['element'] ?? ( $field['raw']['element'] ?? '' );
+        $email     = sanitize_email( $formData[ $field_key ] ?? '' );
+        if ( ! $email ) {
+            return $error;
+        }
+        $d = self::get_decision( $email, 'fluent_forms' );
+        if ( $d['block'] ) {
+            return esc_html( $d['message'] );
+        }
+        if ( $d['warn'] ) {
+            self::set_generic_warn_cookie( $d['message'] );
+        }
+        return $error;
+    }
+
+    // ── Generic cookie-based warn (Elementor / Ninja / Fluent) ───────────────
+
+    /**
+     * Store a warn message in a short-lived cookie; rendered via wp_footer on
+     * the next page the user lands on (or on the current page if not an AJAX
+     * single-page form environment).
+     */
+    private static function set_generic_warn_cookie( $message ) {
+        setcookie(
+            'leadcop_gwarn',
+            $message,
+            time() + 120,
+            defined( 'COOKIEPATH' ) ? COOKIEPATH : '/',
+            defined( 'COOKIE_DOMAIN' ) ? COOKIE_DOMAIN : '',
+            is_ssl(),
+            true
+        );
+    }
+
+    public static function render_generic_warn_footer() {
+        if ( empty( $_COOKIE['leadcop_gwarn'] ) ) {
+            return;
+        }
+        $msg = sanitize_text_field( wp_unslash( $_COOKIE['leadcop_gwarn'] ) );
+        setcookie( 'leadcop_gwarn', '', time() - 3600, defined( 'COOKIEPATH' ) ? COOKIEPATH : '/' );
+        $style = esc_js( self::warn_style() );
+        $json  = wp_json_encode( $msg );
+        echo "<script>
+(function(){
+    var msg=" . $json . ";
+    var el=document.createElement('p');
+    el.style.cssText='" . $style . "';
+    el.textContent=msg;
+    document.body.prepend(el);
+})();
+</script>\n";
     }
 }
